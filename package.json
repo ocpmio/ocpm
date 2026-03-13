@@ -1,0 +1,32 @@
+{
+  "name": "@ocpm/ocpm",
+  "version": "0.0.1",
+  "description": "OpenClaw package manager CLI for reusable agent packages.",
+  "bin": {
+    "ocpm": "bin/ocpm.js"
+  },
+  "files": [
+    "bin",
+    "cmd",
+    "dist",
+    "go.mod",
+    "go.sum",
+    "internal",
+    "scripts",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "go build -trimpath -o dist/ocpm ./cmd/ocpm",
+    "test": "go test ./...",
+    "postinstall": "node scripts/postinstall.js",
+    "stage:npm-release": "node scripts/stage-npm-release.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  }
+}
