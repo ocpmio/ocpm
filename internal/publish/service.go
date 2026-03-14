@@ -604,6 +604,14 @@ func manifestTag(file manifest.File) string {
 func defaultPublishEntries() []string {
 	return []string{
 		manifest.FileName,
+		"AGENTS.md",
+		"SOUL.md",
+		"IDENTITY.md",
+		"TOOLS.md",
+		"MEMORY.md",
+		"BOOTSTRAP.md",
+		"USER.md",
+		"HEARTBEAT.md",
 		"README",
 		"README.md",
 		"README.txt",

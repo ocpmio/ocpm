@@ -261,6 +261,8 @@ Initialize a manifest:
 ocpm init --workspace-manifest
 ```
 
+`ocpm init` now behaves more like `npm init`: it infers a package `name`, `version`, `kind`, and a sensible `files` allowlist from the current directory so the result is publishable without hand-editing in common workspace cases.
+
 Add a skill into an existing workspace:
 
 ```bash

@@ -53,6 +53,10 @@ type InitRequest struct {
 	Path              string
 	Cwd               string
 	WorkspaceManifest bool
+	Name              string
+	Version           string
+	Kind              registry.PackageKind
+	Private           bool
 	Force             bool
 	DryRun            bool
 }
@@ -138,7 +142,10 @@ func (s *Service) Init(_ context.Context, request InitRequest) (ChangeResult, er
 		}
 	}
 
-	file := manifest.Default(workspaceManifest)
+	file, err := defaultInitManifest(target, workspaceManifest, request)
+	if err != nil {
+		return ChangeResult{}, err
+	}
 	data, err := manifest.Marshal(file)
 	if err != nil {
 		return ChangeResult{}, err
@@ -842,4 +849,58 @@ func defaultDirName(pkg string) string {
 	pkg = strings.TrimPrefix(pkg, "@")
 	pkg = strings.ReplaceAll(pkg, "/", "-")
 	return pkg
+}
+
+func defaultInitManifest(target string, workspaceManifest bool, request InitRequest) (manifest.File, error) {
+	file := manifest.Default(workspaceManifest)
+	file.Private = request.Private
+	file.Name = request.Name
+	if file.Name == "" {
+		file.Name = inferPackageName(target)
+	}
+	file.Version = request.Version
+	if file.Version == "" {
+		file.Version = "0.1.0"
+	}
+	file.Kind = request.Kind
+	if file.Kind == "" {
+		file.Kind = inferPackageKind(target, workspaceManifest)
+	} else if !knownPackageKind(file.Kind) {
+		return manifest.File{}, fmt.Errorf("invalid kind %q; use skill, overlay, workspace-template, or agent", file.Kind)
+	}
+	return file, nil
+}
+
+func inferPackageName(target string) string {
+	name := filepath.Base(target)
+	name = strings.TrimSpace(strings.ToLower(name))
+	name = strings.ReplaceAll(name, " ", "-")
+	return name
+}
+
+func inferPackageKind(target string, workspaceManifest bool) registry.PackageKind {
+	if workspaceManifest {
+		return registry.KindAgent
+	}
+	if pathIsDir(filepath.Join(target, "skills")) {
+		return registry.KindSkill
+	}
+	if pathIsDir(filepath.Join(target, "templates")) {
+		return registry.KindOverlay
+	}
+	return registry.KindSkill
+}
+
+func pathIsDir(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.IsDir()
+}
+
+func knownPackageKind(kind registry.PackageKind) bool {
+	switch kind {
+	case registry.KindSkill, registry.KindOverlay, registry.KindWorkspaceTemplate, registry.KindAgent:
+		return true
+	default:
+		return false
+	}
 }

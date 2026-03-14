@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/marian2js/ocpm/internal/lockfile"
+	"github.com/marian2js/ocpm/internal/manifest"
+	"github.com/marian2js/ocpm/internal/publish"
 	"github.com/marian2js/ocpm/internal/registry"
 	"github.com/marian2js/ocpm/internal/workspace"
 )
@@ -158,5 +160,51 @@ func TestDoctorReportsCorruptedManagedSections(t *testing.T) {
 	}
 	if len(result.CorruptedManagedFiles) == 0 || result.CorruptedManagedFiles[0] != "AGENTS.md" {
 		t.Fatalf("expected AGENTS.md corruption to be reported, got %+v", result.CorruptedManagedFiles)
+	}
+}
+
+func TestInitCreatesPublishableWorkspaceManifest(t *testing.T) {
+	service := newTestService(&stubOpenClaw{})
+	workspaceDir := t.TempDir()
+	for _, name := range []string{"AGENTS.md", "SOUL.md", "IDENTITY.md", "TOOLS.md", "BOOTSTRAP.md"} {
+		if err := os.WriteFile(filepath.Join(workspaceDir, name), []byte("# "+name+"\n"), 0o644); err != nil {
+			t.Fatalf("WriteFile: %v", err)
+		}
+	}
+
+	if _, err := service.Init(context.Background(), InitRequest{
+		Path: workspaceDir,
+		Cwd:  workspaceDir,
+	}); err != nil {
+		t.Fatalf("Init returned error: %v", err)
+	}
+
+	manifestFile, err := manifest.ReadFromDir(workspaceDir)
+	if err != nil {
+		t.Fatalf("ReadFromDir returned error: %v", err)
+	}
+	if manifestFile.Name == "" || manifestFile.Version == "" || manifestFile.Kind == "" {
+		t.Fatalf("expected publish defaults in manifest, got %+v", manifestFile)
+	}
+	if manifestFile.Private {
+		t.Fatalf("expected init to default to a publishable manifest")
+	}
+	if manifestFile.Description != "" {
+		t.Fatalf("expected init to omit generated description, got %q", manifestFile.Description)
+	}
+	if len(manifestFile.Files) != 0 {
+		t.Fatalf("expected init to omit generated files allowlist, got %+v", manifestFile.Files)
+	}
+
+	publishService := publish.NewService(registry.NewMemoryRegistry(nil))
+	result, err := publishService.Pack(context.Background(), publish.Request{
+		Cwd:    workspaceDir,
+		DryRun: true,
+	})
+	if err != nil {
+		t.Fatalf("Pack returned error after init: %v", err)
+	}
+	if result.Name == "" || result.FileCount == 0 {
+		t.Fatalf("unexpected pack result: %+v", result)
 	}
 }

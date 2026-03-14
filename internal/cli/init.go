@@ -4,12 +4,17 @@ import (
 	"fmt"
 
 	"github.com/marian2js/ocpm/internal/install"
+	"github.com/marian2js/ocpm/internal/registry"
 	"github.com/spf13/cobra"
 )
 
 func newInitCommand(deps Dependencies) *cobra.Command {
 	var workspacePath string
 	var workspaceManifest bool
+	var name string
+	var version string
+	var kind string
+	var private bool
 	var force bool
 	var dryRun bool
 
@@ -22,6 +27,10 @@ func newInitCommand(deps Dependencies) *cobra.Command {
 				Path:              workspacePath,
 				Cwd:               mustGetwd(),
 				WorkspaceManifest: workspaceManifest,
+				Name:              name,
+				Version:           version,
+				Kind:              registry.PackageKind(kind),
+				Private:           private,
 				Force:             force,
 				DryRun:            dryRun,
 			})
@@ -37,6 +46,10 @@ func newInitCommand(deps Dependencies) *cobra.Command {
 
 	cmd.Flags().StringVar(&workspacePath, "workspace", "", "Path to initialize")
 	cmd.Flags().BoolVar(&workspaceManifest, "workspace-manifest", false, "Mark the manifest as describing a workspace")
+	cmd.Flags().StringVar(&name, "name", "", "Package name override")
+	cmd.Flags().StringVar(&version, "version", "", "Package version override")
+	cmd.Flags().StringVar(&kind, "kind", "", "Package kind override: skill, overlay, workspace-template, or agent")
+	cmd.Flags().BoolVar(&private, "private", false, "Mark the initialized package as private")
 	cmd.Flags().BoolVar(&force, "force", false, "Overwrite ocpm.json if it already exists")
 	cmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview changes without writing files")
 	return cmd
