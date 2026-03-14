@@ -197,7 +197,7 @@ The lockfile persists exact versions, integrity, selected options, installed fil
 - `ocpm pack`: validates the current package and writes a local `.tgz`
 - `ocpm publish --dry-run`: validates and reports what would be published without writing or uploading
 - `ocpm publish --out <file>`: writes the packaged artifact locally instead of uploading
-- `ocpm publish --yes`: validates, assembles, and uploads through the registry client abstraction
+- `ocpm publish`: validates, assembles, and uploads through the registry client abstraction
 
 Human output and `--json` both include:
 
@@ -312,7 +312,7 @@ ocpm publish --path /path/to/package --dry-run --list
 Publish through the registry abstraction:
 
 ```bash
-ocpm publish --path /path/to/package --yes
+ocpm publish --path /path/to/package
 ```
 
 Authenticate the CLI with the hosted service:

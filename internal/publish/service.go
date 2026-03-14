@@ -44,7 +44,6 @@ type Request struct {
 	RegistryURL string
 	Out         string
 	Access      string
-	Yes         bool
 	ListFiles   bool
 }
 
@@ -143,10 +142,6 @@ func (s *Service) Publish(ctx context.Context, request Request) (Result, error) 
 
 	if request.DryRun {
 		return result, nil
-	}
-
-	if !request.Yes {
-		return Result{}, fmt.Errorf("refusing to upload without --yes")
 	}
 
 	exists, err := s.Registry.CheckVersion(ctx, result.Name, result.Version)

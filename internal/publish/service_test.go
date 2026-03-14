@@ -218,7 +218,7 @@ func TestPublishStoresArtifactInMockRegistry(t *testing.T) {
 	registryClient := registry.NewMemoryRegistry(nil)
 	service := NewService(registryClient)
 
-	result, err := service.Publish(context.Background(), Request{Cwd: root, Yes: true})
+	result, err := service.Publish(context.Background(), Request{Cwd: root})
 	if err != nil {
 		t.Fatalf("Publish returned error: %v", err)
 	}
@@ -242,10 +242,10 @@ func TestPublishRejectsDuplicateVersion(t *testing.T) {
 	registryClient := registry.NewMemoryRegistry(nil)
 	service := NewService(registryClient)
 
-	if _, err := service.Publish(context.Background(), Request{Cwd: root, Yes: true}); err != nil {
+	if _, err := service.Publish(context.Background(), Request{Cwd: root}); err != nil {
 		t.Fatalf("first Publish returned error: %v", err)
 	}
-	if _, err := service.Publish(context.Background(), Request{Cwd: root, Yes: true}); err == nil || !strings.Contains(err.Error(), "already published") {
+	if _, err := service.Publish(context.Background(), Request{Cwd: root}); err == nil || !strings.Contains(err.Error(), "already published") {
 		t.Fatalf("expected duplicate version rejection, got %v", err)
 	}
 }

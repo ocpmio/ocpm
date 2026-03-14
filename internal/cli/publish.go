@@ -30,7 +30,7 @@ func newPackCommand(deps Dependencies) *cobra.Command {
 		},
 	}
 
-	bindPublishFlags(cmd, &request, &jsonOutput, false)
+	bindPublishFlags(cmd, &request, &jsonOutput)
 	return cmd
 }
 
@@ -56,11 +56,11 @@ func newPublishCommand(deps Dependencies) *cobra.Command {
 		},
 	}
 
-	bindPublishFlags(cmd, &request, &jsonOutput, true)
+	bindPublishFlags(cmd, &request, &jsonOutput)
 	return cmd
 }
 
-func bindPublishFlags(cmd *cobra.Command, request *publish.Request, jsonOutput *bool, includeYes bool) {
+func bindPublishFlags(cmd *cobra.Command, request *publish.Request, jsonOutput *bool) {
 	cmd.Flags().StringVar(&request.Path, "path", "", "Package directory to pack or publish")
 	cmd.Flags().BoolVar(&request.DryRun, "dry-run", false, "Validate and assemble without writing or uploading")
 	cmd.Flags().BoolVar(jsonOutput, "json", false, "Emit machine-readable JSON")
@@ -70,9 +70,6 @@ func bindPublishFlags(cmd *cobra.Command, request *publish.Request, jsonOutput *
 	cmd.Flags().StringVar(&request.Out, "out", "", "Write the tarball to a local file")
 	cmd.Flags().StringVar(&request.Access, "access", "", "Package access level: public or private")
 	cmd.Flags().BoolVar(&request.ListFiles, "list", false, "Print packaged file contents")
-	if includeYes {
-		cmd.Flags().BoolVar(&request.Yes, "yes", false, "Confirm that the artifact should be uploaded")
-	}
 }
 
 func printPublishResult(out commandWriter, result publish.Result, listFiles bool) error {
