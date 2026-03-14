@@ -608,7 +608,6 @@ func defaultPublishEntries() []string {
 		"SOUL.md",
 		"IDENTITY.md",
 		"TOOLS.md",
-		"MEMORY.md",
 		"BOOTSTRAP.md",
 		"USER.md",
 		"HEARTBEAT.md",

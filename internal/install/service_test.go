@@ -195,6 +195,13 @@ func TestInitCreatesPublishableWorkspaceManifest(t *testing.T) {
 	if len(manifestFile.Files) != 0 {
 		t.Fatalf("expected init to omit generated files allowlist, got %+v", manifestFile.Files)
 	}
+	ignoreData, err := os.ReadFile(filepath.Join(workspaceDir, ".ocpmignore"))
+	if err != nil {
+		t.Fatalf("ReadFile returned error: %v", err)
+	}
+	if string(ignoreData) != defaultIgnoreFileContent {
+		t.Fatalf("unexpected .ocpmignore contents: %q", string(ignoreData))
+	}
 
 	publishService := publish.NewService(registry.NewMemoryRegistry(nil))
 	result, err := publishService.Pack(context.Background(), publish.Request{

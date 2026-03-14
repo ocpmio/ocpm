@@ -74,6 +74,8 @@ func hardExcluded(path string) bool {
 		return true
 	case path == ".ocpm" || strings.HasPrefix(path, ".ocpm/"):
 		return true
+	case base == "MEMORY.md":
+		return true
 	case path == "memory" || strings.HasPrefix(path, "memory/"):
 		return true
 	case path == "tmp" || strings.HasPrefix(path, "tmp/"):

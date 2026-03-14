@@ -27,6 +27,8 @@ type Service struct {
 	Now      func() time.Time
 }
 
+const defaultIgnoreFileContent = "MEMORY.md\nmemory/\n"
+
 type ChangeRequest struct {
 	WorkspacePath    string
 	Cwd              string
@@ -136,6 +138,7 @@ func (s *Service) Init(_ context.Context, request InitRequest) (ChangeResult, er
 	}
 
 	manifestPath := filepath.Join(target, manifest.FileName)
+	ignorePath := filepath.Join(target, ".ocpmignore")
 	if !request.Force {
 		if _, err := os.Stat(manifestPath); err == nil {
 			return ChangeResult{}, fmt.Errorf("%s already exists; use --force to overwrite it", manifest.FileName)
@@ -155,11 +158,8 @@ func (s *Service) Init(_ context.Context, request InitRequest) (ChangeResult, er
 		WorkspacePath: target,
 		Operations: []materialize.Operation{
 			{Action: "write-file", Path: manifest.FileName},
+			{Action: "write-file", Path: ".ocpmignore"},
 		},
-	}
-
-	if workspaceManifest {
-		result.Operations = append(result.Operations, materialize.Operation{Action: "ensure-dir", Path: ".ocpm"})
 	}
 
 	if request.DryRun {
@@ -172,10 +172,8 @@ func (s *Service) Init(_ context.Context, request InitRequest) (ChangeResult, er
 	if err := writeIfChanged(manifestPath, data); err != nil {
 		return ChangeResult{}, err
 	}
-	if workspaceManifest {
-		if err := os.MkdirAll(filepath.Join(target, ".ocpm"), 0o755); err != nil {
-			return ChangeResult{}, err
-		}
+	if err := writeIfChanged(ignorePath, []byte(defaultIgnoreFileContent)); err != nil {
+		return ChangeResult{}, err
 	}
 	return result, nil
 }

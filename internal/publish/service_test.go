@@ -64,6 +64,7 @@ func TestDefaultSelectionExcludesRuntimeState(t *testing.T) {
 	writeFile(t, filepath.Join(root, "skills", "browser", "SKILL.md"), "skill\n")
 	writeFile(t, filepath.Join(root, "payload", "data.txt"), "payload\n")
 	writeFile(t, filepath.Join(root, "README.md"), "readme\n")
+	writeFile(t, filepath.Join(root, "MEMORY.md"), "memory doc\n")
 	writeFile(t, filepath.Join(root, "memory", "state.txt"), "state\n")
 	writeFile(t, filepath.Join(root, ".env"), "secret\n")
 	writeFile(t, filepath.Join(root, "ocpm-lock.json"), "{}\n")
@@ -77,7 +78,7 @@ func TestDefaultSelectionExcludesRuntimeState(t *testing.T) {
 	if !contains(got, manifest.FileName) || !contains(got, "skills/browser/SKILL.md") || !contains(got, "payload/data.txt") {
 		t.Fatalf("expected publishable files to be included, got %v", got)
 	}
-	if contains(got, "memory/state.txt") || contains(got, ".env") || contains(got, "ocpm-lock.json") {
+	if contains(got, "MEMORY.md") || contains(got, "memory/state.txt") || contains(got, ".env") || contains(got, "ocpm-lock.json") {
 		t.Fatalf("expected runtime state to be excluded, got %v", got)
 	}
 }
