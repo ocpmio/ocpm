@@ -2,8 +2,6 @@ package registry
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"slices"
@@ -212,8 +210,11 @@ func enrichPackage(pkg PackageVersion) PackageVersion {
 		pkg.ResolvedURL = fmt.Sprintf("mock://registry/%s/%s", strings.TrimPrefix(pkg.Name, "@"), pkg.Version)
 	}
 	if pkg.Integrity == "" {
-		sum := sha256.Sum256(mustJSON(pkg))
-		pkg.Integrity = "sha256:" + hex.EncodeToString(sum[:])
+		integrity, err := ComputePackageIntegrity(pkg)
+		if err != nil {
+			panic(err)
+		}
+		pkg.Integrity = integrity
 	}
 	return pkg
 }

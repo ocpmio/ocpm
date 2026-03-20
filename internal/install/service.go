@@ -51,6 +51,17 @@ type CreateRequest struct {
 	Prompter         ui.Prompter
 }
 
+type OpenClawInstallRequest struct {
+	WorkspacePath  string
+	Cwd            string
+	Package        string
+	Version        string
+	AgentName      string
+	PackageOptions map[string]string
+	DryRun         bool
+	Prompter       ui.Prompter
+}
+
 type InitRequest struct {
 	Path              string
 	Cwd               string
@@ -259,7 +270,7 @@ func (s *Service) Create(ctx context.Context, request CreateRequest) (ChangeResu
 		return ChangeResult{}, fmt.Errorf("%s already exists and is not empty", targetDir)
 	}
 
-	pkg, err := s.Registry.Resolve(ctx, request.Package, request.Version)
+	pkg, err := s.resolvePackage(ctx, request.Package, request.Version)
 	if err != nil {
 		return ChangeResult{}, err
 	}
@@ -319,6 +330,106 @@ func (s *Service) Create(ctx context.Context, request CreateRequest) (ChangeResu
 		PackageKind:   pkg.Kind,
 		Operations:    ops,
 		Skipped:       syncResult.Skipped,
+	}, nil
+}
+
+func (s *Service) InstallToOpenClaw(ctx context.Context, request OpenClawInstallRequest) (ChangeResult, error) {
+	if s.OpenClaw == nil || !s.OpenClaw.IsInstalled(ctx) {
+		return ChangeResult{}, openclaw.ErrNotInstalled
+	}
+
+	targetDir := filepath.Clean(request.WorkspacePath)
+	if targetDir == "" || targetDir == "." {
+		return ChangeResult{}, fmt.Errorf("openclaw workspace path is required")
+	}
+	if strings.TrimSpace(request.AgentName) == "" {
+		return ChangeResult{}, fmt.Errorf("openclaw agent name is required")
+	}
+
+	empty, err := dirEmpty(targetDir)
+	if err != nil {
+		return ChangeResult{}, err
+	}
+	if !empty {
+		return ChangeResult{}, fmt.Errorf("%s already exists and is not empty", targetDir)
+	}
+
+	if request.DryRun {
+		createResult, err := s.Create(ctx, CreateRequest{
+			Cwd:            request.Cwd,
+			Dir:            targetDir,
+			Package:        request.Package,
+			Version:        request.Version,
+			PackageOptions: request.PackageOptions,
+			DryRun:         true,
+			Prompter:       request.Prompter,
+		})
+		if err != nil {
+			return ChangeResult{}, err
+		}
+		operations := append([]materialize.Operation{
+			{Action: "openclaw-add", Path: targetDir, Detail: request.AgentName},
+			{Action: "replace-dir", Path: targetDir},
+		}, createResult.Operations...)
+		return ChangeResult{
+			WorkspacePath: targetDir,
+			Package:       createResult.Package,
+			PackageKind:   createResult.PackageKind,
+			Operations:    operations,
+			Skipped:       createResult.Skipped,
+		}, nil
+	}
+
+	parentDir := filepath.Dir(targetDir)
+	if err := os.MkdirAll(parentDir, 0o755); err != nil {
+		return ChangeResult{}, err
+	}
+
+	stageDir, err := os.MkdirTemp(parentDir, "."+filepath.Base(targetDir)+".ocpm-stage-")
+	if err != nil {
+		return ChangeResult{}, err
+	}
+	cleanupStage := true
+	defer func() {
+		if cleanupStage {
+			_ = os.RemoveAll(stageDir)
+		}
+	}()
+
+	createResult, err := s.Create(ctx, CreateRequest{
+		Cwd:            request.Cwd,
+		Dir:            stageDir,
+		Package:        request.Package,
+		Version:        request.Version,
+		PackageOptions: request.PackageOptions,
+		Prompter:       request.Prompter,
+	})
+	if err != nil {
+		return ChangeResult{}, err
+	}
+
+	if err := s.OpenClaw.AddAgent(ctx, request.AgentName, targetDir); err != nil {
+		return ChangeResult{}, err
+	}
+	if err := os.RemoveAll(targetDir); err != nil {
+		return ChangeResult{}, err
+	}
+	if err := os.Rename(stageDir, targetDir); err != nil {
+		cleanupStage = false
+		return ChangeResult{}, fmt.Errorf("failed to replace %s with staged workspace %s: %w", targetDir, stageDir, err)
+	}
+	cleanupStage = false
+
+	operations := append([]materialize.Operation{
+		{Action: "openclaw-add", Path: targetDir, Detail: request.AgentName},
+		{Action: "replace-dir", Path: targetDir},
+	}, createResult.Operations...)
+	return ChangeResult{
+		WorkspacePath: targetDir,
+		Package:       createResult.Package,
+		PackageKind:   createResult.PackageKind,
+		Operations:    operations,
+		Skipped:       createResult.Skipped,
 	}, nil
 }
 
@@ -598,7 +709,7 @@ func (s *Service) resolveGraph(ctx context.Context, dependencies map[string]stri
 			constraints[name] = constraint
 		}
 
-		pkg, err := s.Registry.Resolve(ctx, name, constraint)
+		pkg, err := s.resolvePackage(ctx, name, constraint)
 		if err != nil {
 			return err
 		}
@@ -630,6 +741,10 @@ func (s *Service) resolveGraph(ctx context.Context, dependencies map[string]stri
 		}
 	}
 	return resolved, nil
+}
+
+func (s *Service) ResolvePackage(ctx context.Context, name, version string) (registry.PackageVersion, error) {
+	return s.resolvePackage(ctx, name, version)
 }
 
 func (s *Service) desiredPackages(resolved map[string]registry.PackageVersion, manifestFile manifest.File, currentLock lockfile.File, overridePackage string, overrideOptions map[string]string, prompter ui.Prompter) ([]materialize.DesiredPackage, map[string]map[string]string, error) {
@@ -901,4 +1016,18 @@ func knownPackageKind(kind registry.PackageKind) bool {
 	default:
 		return false
 	}
+}
+
+func (s *Service) resolvePackage(ctx context.Context, name, constraint string) (registry.PackageVersion, error) {
+	pkg, err := s.Registry.Resolve(ctx, name, constraint)
+	if err != nil {
+		return registry.PackageVersion{}, err
+	}
+	if pkg.Name != name {
+		return registry.PackageVersion{}, fmt.Errorf("registry returned %s while resolving %s", pkg.Name, name)
+	}
+	if err := registry.VerifyPackage(pkg); err != nil {
+		return registry.PackageVersion{}, fmt.Errorf("integrity verification failed for %s@%s: %w", pkg.Name, pkg.Version, err)
+	}
+	return pkg, nil
 }

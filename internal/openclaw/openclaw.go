@@ -3,6 +3,7 @@ package openclaw
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os/exec"
@@ -24,10 +25,20 @@ type Client interface {
 	IsInstalled(ctx context.Context) bool
 	DefaultWorkspace(ctx context.Context) (string, error)
 	SetupWorkspace(ctx context.Context, path string) error
+	ListAgents(ctx context.Context) ([]AgentSummary, error)
+	AddAgent(ctx context.Context, name, workspacePath string) error
 }
 
 type Adapter struct {
 	runner Runner
+}
+
+type AgentSummary struct {
+	ID        string `json:"id"`
+	Name      string `json:"name,omitempty"`
+	Workspace string `json:"workspace"`
+	AgentDir  string `json:"agentDir,omitempty"`
+	IsDefault bool   `json:"isDefault,omitempty"`
 }
 
 type ExecRunner struct{}
@@ -95,5 +106,42 @@ func (a *Adapter) SetupWorkspace(ctx context.Context, path string) error {
 	}
 
 	_, err := a.runner.Run(ctx, "openclaw", "setup", "--workspace", path)
+	return err
+}
+
+func (a *Adapter) ListAgents(ctx context.Context) ([]AgentSummary, error) {
+	if !a.IsInstalled(ctx) {
+		return nil, ErrNotInstalled
+	}
+
+	output, err := a.runner.Run(ctx, "openclaw", "agents", "list", "--json")
+	if err != nil {
+		return nil, err
+	}
+	if strings.TrimSpace(output) == "" {
+		return nil, nil
+	}
+
+	var agents []AgentSummary
+	if err := json.Unmarshal([]byte(output), &agents); err != nil {
+		return nil, err
+	}
+	for i := range agents {
+		if agents[i].Workspace != "" {
+			agents[i].Workspace = filepath.Clean(agents[i].Workspace)
+		}
+		if agents[i].AgentDir != "" {
+			agents[i].AgentDir = filepath.Clean(agents[i].AgentDir)
+		}
+	}
+	return agents, nil
+}
+
+func (a *Adapter) AddAgent(ctx context.Context, name, workspacePath string) error {
+	if !a.IsInstalled(ctx) {
+		return ErrNotInstalled
+	}
+
+	_, err := a.runner.Run(ctx, "openclaw", "agents", "add", name, "--workspace", workspacePath, "--non-interactive")
 	return err
 }

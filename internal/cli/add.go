@@ -13,13 +13,6 @@ func newAddCommand(deps Dependencies) *cobra.Command {
 	return newAddLikeCommand(deps, "add", "Add a package into an existing workspace")
 }
 
-func newInstallCommand(deps Dependencies) *cobra.Command {
-	cmd := newAddLikeCommand(deps, "install", "Install a package into an existing workspace")
-	cmd.Short = "Install a package into an existing workspace (alias for add)"
-	cmd.Aliases = []string{"i"}
-	return cmd
-}
-
 func newAddLikeCommand(deps Dependencies, use, short string) *cobra.Command {
 	var flags commonFlags
 	var version string

@@ -5,19 +5,21 @@ import (
 
 	"github.com/marian2js/ocpm/internal/auth"
 	"github.com/marian2js/ocpm/internal/install"
+	"github.com/marian2js/ocpm/internal/openclaw"
 	"github.com/marian2js/ocpm/internal/publish"
 	"github.com/marian2js/ocpm/internal/version"
 	"github.com/spf13/cobra"
 )
 
 type Dependencies struct {
-	Stdin   io.Reader
-	Stdout  io.Writer
-	Stderr  io.Writer
-	Build   version.Info
-	Install *install.Service
-	Publish *publish.Service
-	Auth    *auth.Service
+	Stdin    io.Reader
+	Stdout   io.Writer
+	Stderr   io.Writer
+	Build    version.Info
+	Install  *install.Service
+	OpenClaw openclaw.Client
+	Publish  *publish.Service
+	Auth     *auth.Service
 }
 
 func NewRootCommand(deps Dependencies) *cobra.Command {

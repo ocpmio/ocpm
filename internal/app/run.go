@@ -40,13 +40,14 @@ func Run(ctx context.Context, stdout io.Writer, stderr io.Writer, info version.I
 	)
 
 	cmd := cli.NewRootCommand(cli.Dependencies{
-		Stdin:   os.Stdin,
-		Stdout:  stdout,
-		Stderr:  stderr,
-		Build:   info,
-		Install: service,
-		Publish: publishService,
-		Auth:    authService,
+		Stdin:    os.Stdin,
+		Stdout:   stdout,
+		Stderr:   stderr,
+		Build:    info,
+		Install:  service,
+		OpenClaw: openclawClient,
+		Publish:  publishService,
+		Auth:     authService,
 	})
 	cmd.SetArgs(args)
 

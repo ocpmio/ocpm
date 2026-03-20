@@ -30,14 +30,21 @@ ocpm auth logout
 ocpm version
 ```
 
-`ocpm install` is a friendly alias for `ocpm add`. By default, `add` and `install` only allow `skill` and `overlay` packages. `agent` and `workspace-template` packages must normally be used with `ocpm create`.
+`ocpm add` remains the boring workspace command for `skill` and `overlay` packages.
+
+`ocpm install` is now the guided entrypoint:
+
+- for `skill` and `overlay` packages, it behaves like `ocpm add`
+- for `agent` and `workspace-template` packages, it prompts for an install target:
+  - `current path`: create a new folder in the current directory
+  - `openclaw`: call `openclaw agents add <name> --workspace <path>`, keep OpenClaw's agent configuration, then replace the created workspace folder with the packaged agent workspace
 
 ## Package Kinds
 
 - `skill`: install into an existing workspace with `ocpm add`
 - `overlay`: install into an existing workspace with `ocpm add`
-- `workspace-template`: create a fresh workspace with `ocpm create`
-- `agent`: create a fresh workspace with `ocpm create`
+- `workspace-template`: create a fresh workspace with `ocpm create` or guided `ocpm install`
+- `agent`: create a fresh workspace with `ocpm create` or guided `ocpm install`
 
 ## Workspace Targeting
 
@@ -261,7 +268,7 @@ Initialize a manifest:
 ocpm init --workspace-manifest
 ```
 
-`ocpm init` now behaves more like `npm init`: it infers a package `name`, `version`, `kind`, and a sensible `files` allowlist from the current directory so the result is publishable without hand-editing in common workspace cases.
+`ocpm init` now behaves more like `npm init`: it infers a package `name`, `version`, and `kind` from the current directory so the result is publishable without hand-editing in common workspace cases.
 
 Add a skill into an existing workspace:
 
@@ -273,6 +280,18 @@ Create a new workspace from an agent:
 
 ```bash
 ocpm create @acme/founder-agent --dir /path/to/new-workspace
+```
+
+Install an agent into the current directory with the guided flow:
+
+```bash
+ocpm install @acme/founder-agent
+```
+
+Install an agent through OpenClaw without prompts:
+
+```bash
+ocpm install @acme/founder-agent --target openclaw --agent-name ceo-agent --dir ~/.openclaw/workspace-ceo-agent
 ```
 
 Remove a package:

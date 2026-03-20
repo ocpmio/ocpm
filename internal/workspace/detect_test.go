@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/marian2js/ocpm/internal/openclaw"
 )
 
 type mockOpenClaw struct {
@@ -17,6 +19,10 @@ func (m mockOpenClaw) DefaultWorkspace(context.Context) (string, error) {
 	return m.path, nil
 }
 func (m mockOpenClaw) SetupWorkspace(context.Context, string) error { return nil }
+func (m mockOpenClaw) ListAgents(context.Context) ([]openclaw.AgentSummary, error) {
+	return nil, nil
+}
+func (m mockOpenClaw) AddAgent(context.Context, string, string) error { return nil }
 
 func TestDetectRecognizesStrongIndicators(t *testing.T) {
 	dir := t.TempDir()

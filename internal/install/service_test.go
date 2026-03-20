@@ -10,6 +10,7 @@ import (
 
 	"github.com/marian2js/ocpm/internal/lockfile"
 	"github.com/marian2js/ocpm/internal/manifest"
+	"github.com/marian2js/ocpm/internal/openclaw"
 	"github.com/marian2js/ocpm/internal/publish"
 	"github.com/marian2js/ocpm/internal/registry"
 	"github.com/marian2js/ocpm/internal/workspace"
@@ -19,6 +20,9 @@ type stubOpenClaw struct {
 	installed bool
 	path      string
 	setupPath string
+	addedName string
+	addedPath string
+	agents    []openclaw.AgentSummary
 }
 
 func (s *stubOpenClaw) IsInstalled(_ context.Context) bool { return s.installed }
@@ -29,13 +33,28 @@ func (s *stubOpenClaw) SetupWorkspace(_ context.Context, path string) error {
 	s.setupPath = path
 	return nil
 }
+func (s *stubOpenClaw) ListAgents(_ context.Context) ([]openclaw.AgentSummary, error) {
+	return append([]openclaw.AgentSummary(nil), s.agents...), nil
+}
+func (s *stubOpenClaw) AddAgent(_ context.Context, name, workspacePath string) error {
+	s.addedName = name
+	s.addedPath = workspacePath
+	if err := os.MkdirAll(workspacePath, 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(filepath.Join(workspacePath, "AGENTS.md"), []byte("openclaw bootstrap\n"), 0o644)
+}
 
-func newTestService(client *stubOpenClaw) *Service {
-	service := NewService(registry.NewFixtureRegistry(), workspace.NewResolver(client), client)
+func newTestServiceWithRegistry(registryClient registry.Client, client *stubOpenClaw) *Service {
+	service := NewService(registryClient, workspace.NewResolver(client), client)
 	service.Now = func() time.Time {
 		return time.Date(2026, 3, 13, 10, 0, 0, 0, time.UTC)
 	}
 	return service
+}
+
+func newTestService(client *stubOpenClaw) *Service {
+	return newTestServiceWithRegistry(registry.NewFixtureRegistry(), client)
 }
 
 func TestAddAndRemovePackagePreservesUserContent(t *testing.T) {
@@ -213,5 +232,81 @@ func TestInitCreatesPublishableWorkspaceManifest(t *testing.T) {
 	}
 	if result.Name == "" || result.FileCount == 0 {
 		t.Fatalf("unexpected pack result: %+v", result)
+	}
+}
+
+func TestAddRejectsPackageWithInvalidIntegrity(t *testing.T) {
+	openclawClient := &stubOpenClaw{}
+	registryClient := registry.NewMemoryRegistry([]registry.PackageVersion{
+		{
+			Name:      "@acme/tampered-skill",
+			Version:   "1.0.0",
+			Kind:      registry.KindSkill,
+			Integrity: "sha256:deadbeef",
+			Files: map[string]string{
+				"metadata/package.txt": "tampered\n",
+			},
+			Skills: []registry.Skill{
+				{
+					Name: "tampered",
+					Files: map[string]string{
+						"SKILL.md": "# Tampered\n",
+					},
+				},
+			},
+		},
+	})
+	service := newTestServiceWithRegistry(registryClient, openclawClient)
+	workspaceDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(workspaceDir, "AGENTS.md"), []byte("# Agents\n"), 0o644); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+
+	_, err := service.Add(context.Background(), ChangeRequest{
+		Cwd:     workspaceDir,
+		Package: "@acme/tampered-skill",
+	})
+	if err == nil {
+		t.Fatalf("expected integrity verification error")
+	}
+	if !strings.Contains(err.Error(), "integrity verification failed") {
+		t.Fatalf("expected integrity verification failure, got %v", err)
+	}
+}
+
+func TestInstallToOpenClawReplacesWorkspaceFolder(t *testing.T) {
+	openclawClient := &stubOpenClaw{installed: true}
+	service := newTestService(openclawClient)
+	parentDir := t.TempDir()
+	targetDir := filepath.Join(parentDir, "workspace-ceo-agent")
+
+	result, err := service.InstallToOpenClaw(context.Background(), OpenClawInstallRequest{
+		Cwd:           parentDir,
+		Package:       "@acme/founder-agent",
+		AgentName:     "ceo-agent",
+		WorkspacePath: targetDir,
+	})
+	if err != nil {
+		t.Fatalf("InstallToOpenClaw returned error: %v", err)
+	}
+	if openclawClient.addedName != "ceo-agent" {
+		t.Fatalf("expected agent name ceo-agent, got %q", openclawClient.addedName)
+	}
+	if openclawClient.addedPath != targetDir {
+		t.Fatalf("expected workspace path %q, got %q", targetDir, openclawClient.addedPath)
+	}
+	agents, err := os.ReadFile(filepath.Join(targetDir, "AGENTS.md"))
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	if strings.Contains(string(agents), "openclaw bootstrap") {
+		t.Fatalf("expected OpenClaw bootstrap folder to be replaced, got %q", string(agents))
+	}
+	if !strings.Contains(string(agents), "Founder Workspace") {
+		t.Fatalf("expected founder workspace contents, got %q", string(agents))
+	}
+	if result.WorkspacePath != targetDir {
+		t.Fatalf("expected workspace path %q, got %q", targetDir, result.WorkspacePath)
 	}
 }
